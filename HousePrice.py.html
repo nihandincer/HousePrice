@@ -1,0 +1,520 @@
+<html>
+<head>
+<title>HousePriceNihan.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #a9b7c6;}
+.s1 { color: #808080;}
+.s2 { color: #cc7832;}
+.s3 { color: #6a8759;}
+.s4 { color: #6897bb;}
+</style>
+</head>
+<body bgcolor="#2b2b2b">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+HousePriceNihan.py</font>
+</center></td></tr></table>
+<pre>
+<span class="s1">######################################</span>
+<span class="s1"># HOUSE PRİCE</span>
+<span class="s1">######################################</span>
+<span class="s2">import </span><span class="s0">pandas </span><span class="s2">as </span><span class="s0">pd</span>
+<span class="s2">import </span><span class="s0">seaborn </span><span class="s2">as </span><span class="s0">sns</span>
+<span class="s2">import </span><span class="s0">matplotlib.pyplot </span><span class="s2">as </span><span class="s0">plt</span>
+<span class="s2">from </span><span class="s0">sklearn.ensemble </span><span class="s2">import </span><span class="s0">RandomForestRegressor</span>
+<span class="s2">from </span><span class="s0">sklearn.exceptions </span><span class="s2">import </span><span class="s0">ConvergenceWarning</span>
+<span class="s2">from </span><span class="s0">sklearn.metrics </span><span class="s2">import </span><span class="s0">mean_squared_error</span>
+<span class="s2">from </span><span class="s0">sklearn.model_selection </span><span class="s2">import </span><span class="s0">train_test_split</span><span class="s2">, </span><span class="s0">GridSearchCV</span>
+<span class="s2">from </span><span class="s0">helpers.data_prep </span><span class="s2">import </span><span class="s0">*</span>
+<span class="s2">from </span><span class="s0">helpers.eda </span><span class="s2">import </span><span class="s0">*</span>
+<span class="s2">from </span><span class="s0">helpers.feature </span><span class="s2">import </span><span class="s0">*</span>
+
+<span class="s2">import </span><span class="s0">warnings</span>
+<span class="s0">warnings.simplefilter(action=</span><span class="s3">'ignore'</span><span class="s2">, </span><span class="s0">category=FutureWarning)</span>
+<span class="s0">warnings.simplefilter(</span><span class="s3">&quot;ignore&quot;</span><span class="s2">, </span><span class="s0">category=ConvergenceWarning)</span>
+
+<span class="s0">pd.set_option(</span><span class="s3">'display.max_columns'</span><span class="s2">, None</span><span class="s0">)</span>
+<span class="s0">pd.set_option(</span><span class="s3">'display.max_rows'</span><span class="s2">, None</span><span class="s0">)</span>
+<span class="s0">pd.set_option(</span><span class="s3">'display.float_format'</span><span class="s2">, lambda </span><span class="s0">x: </span><span class="s3">'%.3f' </span><span class="s0">% x)</span>
+
+<span class="s1"># DATA</span>
+<span class="s0">train = pd.read_csv(</span><span class="s3">&quot;/Users/nHn/Desktop/house_prices/train.csv&quot;</span><span class="s0">)</span>
+<span class="s0">test = pd.read_csv(</span><span class="s3">&quot;/Users/nHn/Desktop/house_prices/test.csv&quot;</span><span class="s0">)</span>
+<span class="s0">df = train.append(test).reset_index(drop=</span><span class="s2">True</span><span class="s0">)</span>
+<span class="s0">df.head()</span>
+
+<span class="s1">######################################</span>
+<span class="s1"># DATA UNDERSTANDING</span>
+<span class="s1">######################################</span>
+
+<span class="s0">check_df(df)  </span><span class="s1"># (2919,81)</span>
+<span class="s0">cat_cols</span><span class="s2">, </span><span class="s0">cat_but_car</span><span class="s2">, </span><span class="s0">num_cols</span><span class="s2">, </span><span class="s0">num_but_cat = grab_col_names(df</span><span class="s2">, </span><span class="s0">car_th=</span><span class="s4">20</span><span class="s0">)</span>
+<span class="s0">df[num_cols].describe([</span><span class="s4">0.05</span><span class="s2">, </span><span class="s4">0.10</span><span class="s2">, </span><span class="s4">0.25</span><span class="s2">, </span><span class="s4">0.50</span><span class="s2">, </span><span class="s4">0.75</span><span class="s2">, </span><span class="s4">0.80</span><span class="s2">, </span><span class="s4">0.90</span><span class="s2">, </span><span class="s4">0.95</span><span class="s2">, </span><span class="s4">0.99</span><span class="s0">]).T</span>
+
+<span class="s1"># correlation analysis</span>
+<span class="s2">def </span><span class="s0">find_correlation(dataframe</span><span class="s2">, </span><span class="s0">numeric_cols</span><span class="s2">, </span><span class="s0">corr_limit=</span><span class="s4">0.60</span><span class="s0">):</span>
+    <span class="s0">high_correlations = []</span>
+    <span class="s0">low_correlations = []</span>
+    <span class="s2">for </span><span class="s0">col </span><span class="s2">in </span><span class="s0">numeric_cols:</span>
+        <span class="s2">if </span><span class="s0">col == </span><span class="s3">&quot;SalePrice&quot;</span><span class="s0">:</span>
+            <span class="s2">pass</span>
+        <span class="s2">else</span><span class="s0">:</span>
+            <span class="s0">correlation = dataframe[[col</span><span class="s2">, </span><span class="s3">&quot;SalePrice&quot;</span><span class="s0">]].corr().loc[col</span><span class="s2">, </span><span class="s3">&quot;SalePrice&quot;</span><span class="s0">]</span>
+            <span class="s0">print(col</span><span class="s2">, </span><span class="s0">correlation)</span>
+            <span class="s2">if </span><span class="s0">abs(correlation) &gt; corr_limit:</span>
+                <span class="s0">high_correlations.append(col + </span><span class="s3">&quot;: &quot; </span><span class="s0">+ str(correlation))</span>
+            <span class="s2">else</span><span class="s0">:</span>
+                <span class="s0">low_correlations.append(col + </span><span class="s3">&quot;: &quot; </span><span class="s0">+ str(correlation))</span>
+    <span class="s2">return </span><span class="s0">low_correlations</span><span class="s2">, </span><span class="s0">high_correlations</span>
+
+
+<span class="s0">low_corrs</span><span class="s2">, </span><span class="s0">high_corrs = find_correlation(df</span><span class="s2">, </span><span class="s0">num_cols)</span>
+
+<span class="s1"># Only SalePrice &gt; 0.5</span>
+<span class="s0">corrmat = df.corr()</span>
+<span class="s0">top_corr_features = corrmat.index[abs(corrmat[</span><span class="s3">&quot;SalePrice&quot;</span><span class="s0">])&gt;</span><span class="s4">0.5</span><span class="s0">]</span>
+<span class="s0">plt.figure(figsize=(</span><span class="s4">10</span><span class="s2">,</span><span class="s4">10</span><span class="s0">))</span>
+<span class="s0">g = sns.heatmap(df[top_corr_features].corr()</span><span class="s2">,</span><span class="s0">annot=</span><span class="s2">True,</span><span class="s0">cmap=</span><span class="s3">&quot;RdYlGn&quot;</span><span class="s0">)</span>
+<span class="s0">plt.show()</span>
+
+<span class="s1">#######################################</span>
+<span class="s1"># DATA PREPROCESSİNG</span>
+<span class="s1">#######################################</span>
+
+<span class="s2">for </span><span class="s0">col </span><span class="s2">in </span><span class="s0">cat_cols:</span>
+    <span class="s0">cat_summary(df</span><span class="s2">,</span><span class="s0">col)</span>
+
+<span class="s2">for </span><span class="s0">col </span><span class="s2">in </span><span class="s0">cat_but_car:</span>
+    <span class="s0">cat_summary(df</span><span class="s2">,</span><span class="s0">col)</span>
+
+
+<span class="s0">drop_list = [</span><span class="s3">&quot;PoolQC&quot;</span><span class="s2">, </span><span class="s3">&quot;MiscFeature&quot;</span><span class="s2">, </span><span class="s3">&quot;Alley&quot;</span><span class="s2">, </span><span class="s3">&quot;Fence&quot;</span><span class="s2">, </span><span class="s3">&quot;FireplaceQu&quot;</span><span class="s2">, </span><span class="s3">&quot;Street&quot;</span><span class="s2">, </span><span class="s3">&quot;Utilities&quot;</span><span class="s2">,</span>
+             <span class="s3">&quot;Condition2&quot;</span><span class="s2">, </span><span class="s3">&quot;RoofStyle&quot;</span><span class="s2">, </span><span class="s3">&quot;RoofMatl&quot;</span><span class="s2">,</span><span class="s3">&quot;Functional&quot;</span><span class="s2">,</span><span class="s3">&quot;Heating&quot; </span><span class="s2">,</span><span class="s3">&quot;Electrical&quot;</span><span class="s2">, </span><span class="s3">&quot;SaleType&quot;</span><span class="s2">, </span><span class="s3">&quot;SaleCondition&quot;</span><span class="s0">]</span>
+
+<span class="s0">df.drop(drop_list</span><span class="s2">, </span><span class="s0">axis=</span><span class="s4">1</span><span class="s2">, </span><span class="s0">inplace=</span><span class="s2">True</span><span class="s0">)</span>
+
+<span class="s1"># Control.</span>
+<span class="s0">missing_values_table(df)</span>
+
+<span class="s1">##############################################</span>
+
+<span class="s0">zero_cols=[</span><span class="s3">&quot;MSZoning&quot;</span><span class="s2">,</span><span class="s3">&quot;BsmtFullBath&quot;</span><span class="s2">,</span><span class="s3">&quot;BsmtHalfBath&quot;</span><span class="s2">,</span><span class="s3">&quot;BsmtFinSF1&quot;</span><span class="s2">,</span><span class="s3">&quot;BsmtUnfSF&quot;</span><span class="s2">,</span>
+          <span class="s3">&quot;TotalBsmtSF&quot;</span><span class="s2">,</span><span class="s3">&quot;KitchenQual&quot;</span><span class="s2">, </span><span class="s3">&quot;GarageCars&quot;</span><span class="s2">,</span><span class="s3">&quot;Exterior2nd&quot;</span><span class="s2">, </span><span class="s3">&quot;Exterior1st&quot;</span><span class="s2">,</span>
+          <span class="s3">&quot;GarageArea&quot;</span><span class="s2">,</span><span class="s3">&quot;BsmtFinSF2&quot;</span><span class="s2">,</span><span class="s3">&quot;MasVnrType&quot;</span><span class="s2">,</span><span class="s3">&quot;MasVnrArea&quot;</span><span class="s0">]</span>
+
+<span class="s2">for </span><span class="s0">col </span><span class="s2">in </span><span class="s0">zero_cols:</span>
+    <span class="s0">df[col].replace(np.nan</span><span class="s2">, </span><span class="s4">0</span><span class="s2">, </span><span class="s0">inplace=</span><span class="s2">True</span><span class="s0">)</span>
+
+<span class="s1">#############################################</span>
+
+<span class="s1"># These variables are almost the same.</span>
+<span class="s0">df[</span><span class="s3">&quot;GarageCond&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;GarageQual&quot;</span><span class="s0">].value_counts()</span>
+
+<span class="s1"># The other variables are missing values because of the unfinished garages in this variable.</span>
+<span class="s0">df[</span><span class="s3">&quot;GarageFinish&quot;</span><span class="s0">].value_counts()</span>
+
+<span class="s0">df[</span><span class="s3">&quot;GarageYrBlt&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;GarageYrBlt&quot;</span><span class="s0">]=df[</span><span class="s3">&quot;GarageYrBlt&quot;</span><span class="s0">].astype(str)</span>
+
+<span class="s0">df[</span><span class="s3">&quot;GarageType&quot;</span><span class="s0">].value_counts()</span>
+
+<span class="s0">garage_cols=[</span><span class="s3">&quot;GarageCond&quot;</span><span class="s2">,</span><span class="s3">&quot;GarageQual&quot;</span><span class="s2">,</span><span class="s3">&quot;GarageFinish&quot;</span><span class="s2">,</span><span class="s3">&quot;GarageType&quot;</span><span class="s0">]</span>
+
+<span class="s2">for </span><span class="s0">col </span><span class="s2">in </span><span class="s0">garage_cols:</span>
+    <span class="s0">df[col].replace(np.nan</span><span class="s2">,</span><span class="s0">df[col].mode()[</span><span class="s4">0</span><span class="s0">]</span><span class="s2">, </span><span class="s0">inplace=</span><span class="s2">True</span><span class="s0">)</span>
+
+<span class="s1"># Control</span>
+<span class="s0">missing_values_table(df)</span>
+
+
+<span class="s1">############################################</span>
+
+<span class="s0">df[</span><span class="s3">&quot;BsmtExposure&quot;</span><span class="s0">].value_counts()</span>
+
+<span class="s0">df[</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">].value_counts()</span>
+
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] == </span><span class="s3">&quot;Po&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] = </span><span class="s3">&quot;Fa&quot;</span>
+
+<span class="s0">df[</span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">].value_counts()</span>
+
+<span class="s1"># There is missing value in the basement area. other variables are therefore blank.</span>
+<span class="s0">df[</span><span class="s3">&quot;BsmtFinType1&quot;</span><span class="s0">].value_counts()</span>
+
+<span class="s0">df[</span><span class="s3">&quot;BsmtFinType2&quot;</span><span class="s0">].value_counts()</span>
+
+<span class="s0">bsmt_cols=[</span><span class="s3">&quot;BsmtExposure&quot;</span><span class="s2">,</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s2">,</span><span class="s3">&quot;BsmtQual&quot;</span><span class="s2">, </span><span class="s3">&quot;BsmtFinType1&quot;</span><span class="s2">,</span><span class="s3">&quot;BsmtFinType2&quot;</span><span class="s0">]</span>
+
+
+<span class="s2">for </span><span class="s0">col </span><span class="s2">in </span><span class="s0">bsmt_cols:</span>
+    <span class="s0">df[col].replace(np.nan</span><span class="s2">, </span><span class="s0">df[col].mode()[</span><span class="s4">0</span><span class="s0">]</span><span class="s2">, </span><span class="s0">inplace=</span><span class="s2">True</span><span class="s0">)</span>
+
+<span class="s1"># Control.</span>
+<span class="s0">missing_values_table(df)</span>
+
+<span class="s1">##############################################</span>
+
+<span class="s0">df[</span><span class="s3">&quot;LotFrontage&quot;</span><span class="s0">].value_counts()</span>
+
+<span class="s0">df[</span><span class="s3">'LotFrontage'</span><span class="s0">] = df.groupby([</span><span class="s3">'Neighborhood'</span><span class="s0">])[</span><span class="s3">'LotFrontage'</span><span class="s0">].apply(</span><span class="s2">lambda </span><span class="s0">x: x.fillna(x.median()))</span>
+
+<span class="s1">#############################################</span>
+
+<span class="s0">cat_cols</span><span class="s2">, </span><span class="s0">cat_but_car</span><span class="s2">, </span><span class="s0">num_cols</span><span class="s2">, </span><span class="s0">num_but_cat = grab_col_names(df</span><span class="s2">, </span><span class="s0">car_th=</span><span class="s4">20</span><span class="s0">)</span>
+
+<span class="s1"># Thresholds.</span>
+<span class="s2">for </span><span class="s0">col </span><span class="s2">in </span><span class="s0">num_cols:</span>
+    <span class="s0">print(col</span><span class="s2">, </span><span class="s0">check_outlier(df</span><span class="s2">, </span><span class="s0">col))</span>
+
+<span class="s0">replace_with_thresholds(df</span><span class="s2">, </span><span class="s3">&quot;SalePrice&quot;</span><span class="s0">)</span>
+
+<span class="s1"># Control</span>
+<span class="s0">df.describe([</span><span class="s4">0.75</span><span class="s2">,</span><span class="s4">0.5</span><span class="s2">,</span><span class="s4">0.99</span><span class="s2">,</span><span class="s4">1</span><span class="s0">]).T</span>
+
+<span class="s1">############################################</span>
+
+<span class="s0">df[</span><span class="s3">&quot;MSSubClass&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;MSSubClass&quot;</span><span class="s0">].astype(str)</span>
+<span class="s0">df[</span><span class="s3">&quot;YrSold&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;YrSold&quot;</span><span class="s0">].astype(str)</span>
+<span class="s0">df[</span><span class="s3">&quot;MoSold&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;MoSold&quot;</span><span class="s0">].astype(str)</span>
+
+<span class="s1">#############################################</span>
+
+<span class="s1"># analysis of variables</span>
+<span class="s2">def </span><span class="s0">cat_eda(dataframe</span><span class="s2">, </span><span class="s0">cat_length</span><span class="s2">, </span><span class="s0">target=</span><span class="s3">&quot;SalePrice&quot;</span><span class="s0">):</span>
+
+
+    <span class="s1"># if len(ordinal_variable) &gt; 0:</span>
+    <span class="s1">#    dataframe.drop(ordinal_variable, axis = 1, inplace = True)</span>
+
+    <span class="s0">more_cat_cols = [col </span><span class="s2">for </span><span class="s0">col </span><span class="s2">in </span><span class="s0">dataframe.columns </span><span class="s2">if </span><span class="s0">len(dataframe[col].unique()) &lt; cat_length]</span>
+
+    <span class="s2">for </span><span class="s0">i </span><span class="s2">in </span><span class="s0">more_cat_cols:</span>
+        <span class="s0">print(i</span><span class="s2">, </span><span class="s3">&quot;:&quot;</span><span class="s2">, </span><span class="s0">len(dataframe[i].value_counts())</span><span class="s2">, </span><span class="s3">&quot;Unique Category -&quot;</span><span class="s2">, </span><span class="s0">str(dataframe[i].dtype))</span>
+        <span class="s0">print(pd.DataFrame({</span><span class="s3">&quot;COUNT&quot;</span><span class="s0">: dataframe[i].value_counts()</span><span class="s2">,</span>
+                            <span class="s3">&quot;RATIO&quot;</span><span class="s0">: dataframe[i].value_counts() / len(dataframe)</span><span class="s2">,</span>
+                            <span class="s3">&quot;TARGET_MEDIAN&quot;</span><span class="s0">: dataframe.groupby(i)[target].median()</span><span class="s2">,</span>
+                            <span class="s3">&quot;TARGET_COUNT&quot;</span><span class="s0">: dataframe.groupby(i)[target].count()</span><span class="s2">,</span>
+                            <span class="s3">&quot;TARGET_STD&quot;</span><span class="s0">: dataframe.groupby(i)[target].std()})</span><span class="s2">, </span><span class="s0">end=</span><span class="s3">&quot;</span><span class="s2">\n\n\n</span><span class="s3">&quot;</span><span class="s0">)</span>
+
+    <span class="s0">print(</span><span class="s3">&quot;# DTYPES -----------------------------&quot;</span><span class="s0">)</span>
+    <span class="s0">print(</span><span class="s3">&quot;Object Variables:&quot;</span><span class="s2">, </span><span class="s0">dataframe[more_cat_cols].select_dtypes(</span><span class="s3">&quot;object&quot;</span><span class="s0">).columns.tolist()</span><span class="s2">, </span><span class="s3">&quot;</span><span class="s2">\n</span><span class="s3">&quot;</span><span class="s0">)</span>
+    <span class="s0">print(</span><span class="s3">&quot;Integer Variables:&quot;</span><span class="s2">, </span><span class="s0">dataframe[more_cat_cols].select_dtypes(</span><span class="s3">&quot;integer&quot;</span><span class="s0">).columns.tolist()</span><span class="s2">, </span><span class="s3">&quot;</span><span class="s2">\n</span><span class="s3">&quot;</span><span class="s0">)</span>
+    <span class="s0">print(</span><span class="s3">&quot;Float Variables:&quot;</span><span class="s2">, </span><span class="s0">dataframe[more_cat_cols].select_dtypes(</span><span class="s3">&quot;float&quot;</span><span class="s0">).columns.tolist()</span><span class="s2">, </span><span class="s3">&quot;</span><span class="s2">\n</span><span class="s3">&quot;</span><span class="s0">)</span>
+
+
+<span class="s0">cat_eda(df</span><span class="s2">, </span><span class="s0">cat_length=</span><span class="s4">17</span><span class="s0">)</span>
+
+
+<span class="s1">########################################</span>
+<span class="s1">##### I edited the variables I have before generating variables.</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;MSZoning&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;MSZoning&quot;</span><span class="s0">] == </span><span class="s3">&quot;RH&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;MSZoning&quot;</span><span class="s0">] = </span><span class="s3">&quot;RM&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;MSZoning&quot;</span><span class="s0">] ==</span><span class="s3">&quot;C (all)&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;MSZoning&quot;</span><span class="s0">]=</span><span class="s3">&quot;RM&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;MSZoning&quot;</span><span class="s0">] ==</span><span class="s4">0</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;MSZoning&quot;</span><span class="s0">]=</span><span class="s3">&quot;RM&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;MSZoning&quot;</span><span class="s0">] == </span><span class="s3">&quot;Fa&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;MSZoning&quot;</span><span class="s0">]=</span><span class="s3">&quot;RM&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;LotConfig&quot;</span><span class="s0">].value_counts() </span><span class="s1"># parsel yapılandırması</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LotConfig&quot;</span><span class="s0">] == </span><span class="s3">&quot;Corner&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LotConfig&quot;</span><span class="s0">] = </span><span class="s3">&quot;FR2&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LotConfig&quot;</span><span class="s0">] == </span><span class="s3">&quot;Inside&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LotConfig&quot;</span><span class="s0">] = </span><span class="s3">&quot;FR2&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LotConfig&quot;</span><span class="s0">] == </span><span class="s3">&quot;CulDSac&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LotConfig&quot;</span><span class="s0">] = </span><span class="s3">&quot;FR3&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;LandSlope&quot;</span><span class="s0">].value_counts() </span><span class="s1"># parsel yapılandırması</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LandSlope&quot;</span><span class="s0">] == </span><span class="s3">&quot;Sev&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;LandSlope&quot;</span><span class="s0">] = </span><span class="s3">&quot;Mod&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;Condition1&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] == </span><span class="s3">&quot;Feedr&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] = </span><span class="s3">&quot;Artery&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] == </span><span class="s3">&quot;RRAe&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] = </span><span class="s3">&quot;Artery&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] == </span><span class="s3">&quot;RRAn&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] = </span><span class="s3">&quot;Norm&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] == </span><span class="s3">&quot;PosN&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] = </span><span class="s3">&quot;PosA&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] == </span><span class="s3">&quot;RRNe&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] = </span><span class="s3">&quot;PosA&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] == </span><span class="s3">&quot;RRNn&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;Condition1&quot;</span><span class="s0">] = </span><span class="s3">&quot;PosA&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;HouseStyle&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;HouseStyle&quot;</span><span class="s0">] == </span><span class="s3">&quot;1.5Unf&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;HouseStyle&quot;</span><span class="s0">] = </span><span class="s3">&quot;1.5Fin&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;HouseStyle&quot;</span><span class="s0">] == </span><span class="s3">&quot;2.5Unf&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;HouseStyle&quot;</span><span class="s0">] = </span><span class="s3">&quot;2.5Fin&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;OverallQual&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;OverallQual&quot;</span><span class="s0">] = np.where(df.OverallQual.isin([</span><span class="s4">1</span><span class="s2">,</span><span class="s4">2</span><span class="s0">])</span><span class="s2">, </span><span class="s4">3</span><span class="s2">, </span><span class="s0">df[</span><span class="s3">&quot;OverallQual&quot;</span><span class="s0">])</span>
+<span class="s0">df[</span><span class="s3">&quot;OverallQual&quot;</span><span class="s0">] = np.where(df.OverallQual.isin([</span><span class="s4">8</span><span class="s2">,</span><span class="s4">9</span><span class="s0">])</span><span class="s2">, </span><span class="s4">10</span><span class="s2">, </span><span class="s0">df[</span><span class="s3">&quot;OverallQual&quot;</span><span class="s0">])</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;OverallCond&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;OverallCond&quot;</span><span class="s0">] = np.where(df.OverallCond.isin([</span><span class="s4">1</span><span class="s2">,</span><span class="s4">2</span><span class="s0">])</span><span class="s2">, </span><span class="s4">3</span><span class="s2">, </span><span class="s0">df[</span><span class="s3">&quot;OverallCond&quot;</span><span class="s0">])</span>
+<span class="s0">df[</span><span class="s3">&quot;OverallCond&quot;</span><span class="s0">] = np.where(df.OverallCond.isin([</span><span class="s4">7</span><span class="s2">,</span><span class="s4">8</span><span class="s0">])</span><span class="s2">, </span><span class="s4">6</span><span class="s2">, </span><span class="s0">df[</span><span class="s3">&quot;OverallCond&quot;</span><span class="s0">])</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;MasVnrType&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;MasVnrType&quot;</span><span class="s0">] == </span><span class="s4">0</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;MasVnrType&quot;</span><span class="s0">] = </span><span class="s3">&quot;None&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;ExterQual&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;ExterCond&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;ExterCond&quot;</span><span class="s0">] == </span><span class="s3">&quot;Po&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;ExterCond&quot;</span><span class="s0">] = </span><span class="s3">&quot;Fa&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;Foundation&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;Foundation&quot;</span><span class="s0">]==</span><span class="s3">&quot;Stone&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;Foundation&quot;</span><span class="s0">]=</span><span class="s3">&quot;Slab&quot;</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;Foundation&quot;</span><span class="s0">]==</span><span class="s3">&quot;Wood&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;Foundation&quot;</span><span class="s0">]=</span><span class="s3">&quot;Slab&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] == </span><span class="s3">&quot;Po&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] = </span><span class="s3">&quot;Fa&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;BsmtFullBath&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;BsmtFullBath&quot;</span><span class="s0">] = np.where(df.BsmtFullBath == </span><span class="s4">3</span><span class="s2">, </span><span class="s4">2</span><span class="s2">, </span><span class="s0">df.BsmtFullBath)</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;BsmtHalfBath&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;BsmtHalfBath&quot;</span><span class="s0">]=np.where(df.BsmtHalfBath==</span><span class="s4">2</span><span class="s2">,</span><span class="s4">1</span><span class="s2">,</span><span class="s0">df.BsmtHalfBath)</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;TotalFullBath&quot;</span><span class="s0">] = df.BsmtFullBath + df.FullBath</span>
+<span class="s0">df[</span><span class="s3">&quot;TotalHalfBath&quot;</span><span class="s0">] = df.BsmtHalfBath + df.HalfBath</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;TotalBath&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;TotalFullBath&quot;</span><span class="s0">] + (df[</span><span class="s3">&quot;TotalHalfBath&quot;</span><span class="s0">]*</span><span class="s4">0.5</span><span class="s0">)</span>
+<span class="s0">df[</span><span class="s3">&quot;TotalBath&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;TotalBath&quot;</span><span class="s0">] = np.where(df.TotalBath.isin([</span><span class="s4">5</span><span class="s2">,</span><span class="s4">7</span><span class="s0">])</span><span class="s2">, </span><span class="s4">6</span><span class="s2">, </span><span class="s0">df.TotalBath)</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;BedroomAbvGr&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;BedroomAbvGr&quot;</span><span class="s0">]=np.where(df.BedroomAbvGr==</span><span class="s4">0</span><span class="s2">,</span><span class="s4">1</span><span class="s2">,</span><span class="s0">df.BedroomAbvGr)</span>
+<span class="s0">df[</span><span class="s3">&quot;BedroomAbvGr&quot;</span><span class="s0">]=np.where(df.BedroomAbvGr==</span><span class="s4">8</span><span class="s2">,</span><span class="s4">6</span><span class="s2">,</span><span class="s0">df.BedroomAbvGr)</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;KitchenAbvGr&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;KitchenAbvGr&quot;</span><span class="s0">]=np.where(df.KitchenAbvGr==</span><span class="s4">0</span><span class="s2">,</span><span class="s4">1</span><span class="s2">,</span><span class="s0">df.KitchenAbvGr)</span>
+<span class="s0">df[</span><span class="s3">&quot;KitchenAbvGr&quot;</span><span class="s0">]=np.where(df.KitchenAbvGr==</span><span class="s4">3</span><span class="s2">,</span><span class="s4">2</span><span class="s2">,</span><span class="s0">df.KitchenAbvGr)</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;KitchenQual&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;KitchenQual&quot;</span><span class="s0">]=np.where(df.KitchenQual==</span><span class="s4">0</span><span class="s2">,</span><span class="s3">&quot;TA&quot;</span><span class="s2">,</span><span class="s0">df.KitchenQual)</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;Fireplaces&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;Fireplaces&quot;</span><span class="s0">]=np.where(df.Fireplaces.isin([</span><span class="s4">3</span><span class="s2">,</span><span class="s4">4</span><span class="s0">])</span><span class="s2">,</span><span class="s4">2</span><span class="s2">,</span><span class="s0">df.Fireplaces)</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;GarageCars&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df[</span><span class="s3">&quot;GarageCars&quot;</span><span class="s0">]=np.where(df.GarageCars.isin([</span><span class="s4">4</span><span class="s2">,</span><span class="s4">5</span><span class="s0">])</span><span class="s2">,</span><span class="s4">3</span><span class="s2">,</span><span class="s0">df.GarageCars)</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;GarageQual&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;GarageQual&quot;</span><span class="s0">]==</span><span class="s3">&quot;Po&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;GarageQual&quot;</span><span class="s0">]=</span><span class="s3">&quot;Fa&quot;</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;GarageCond&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;GarageCond&quot;</span><span class="s0">]==</span><span class="s3">&quot;Po&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;GarageCond&quot;</span><span class="s0">]=</span><span class="s3">&quot;Fa&quot;</span>
+
+
+<span class="s1">###############################################</span>
+<span class="s1"># Ordinal</span>
+
+<span class="s0">df[</span><span class="s3">&quot;LotShape&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LotShape&quot;</span><span class="s0">] == </span><span class="s3">&quot;IR1&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LotShape&quot;</span><span class="s0">] = </span><span class="s4">2</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LotShape&quot;</span><span class="s0">] == </span><span class="s3">&quot;IR2&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LotShape&quot;</span><span class="s0">] = </span><span class="s4">1</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LotShape&quot;</span><span class="s0">] == </span><span class="s3">&quot;IR3&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LotShape&quot;</span><span class="s0">] = </span><span class="s4">0</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LotShape&quot;</span><span class="s0">] == </span><span class="s3">&quot;Reg&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LotShape&quot;</span><span class="s0">] = </span><span class="s4">3</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;LandContour&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LandContour&quot;</span><span class="s0">] == </span><span class="s3">&quot;Bnk&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LandContour&quot;</span><span class="s0">] = </span><span class="s4">2</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LandContour&quot;</span><span class="s0">] == </span><span class="s3">&quot;HLS&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LandContour&quot;</span><span class="s0">] = </span><span class="s4">1</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LandContour&quot;</span><span class="s0">] == </span><span class="s3">&quot;Low&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LandContour&quot;</span><span class="s0">] = </span><span class="s4">0</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;LandContour&quot;</span><span class="s0">] == </span><span class="s3">&quot;Lvl&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;LandContour&quot;</span><span class="s0">] = </span><span class="s4">3</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">] == </span><span class="s3">&quot;Ex&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">] = </span><span class="s4">3</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">] == </span><span class="s3">&quot;Fa&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">] = </span><span class="s4">0</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">] == </span><span class="s3">&quot;Gd&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">] = </span><span class="s4">2</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">] == </span><span class="s3">&quot;TA&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;BsmtQual&quot;</span><span class="s0">] = </span><span class="s4">1</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] == </span><span class="s3">&quot;Fa&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] = </span><span class="s4">0</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] == </span><span class="s3">&quot;Gd&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] = </span><span class="s4">2</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] == </span><span class="s3">&quot;TA&quot;</span><span class="s0">)</span><span class="s2">, </span><span class="s3">&quot;BsmtCond&quot;</span><span class="s0">] = </span><span class="s4">1</span>
+
+<span class="s0">df[</span><span class="s3">&quot;NEW_BSMT_QUAL_COND&quot;</span><span class="s0">] = df[</span><span class="s3">'BsmtQual'</span><span class="s0">] * df[</span><span class="s3">'BsmtCond'</span><span class="s0">]</span>
+
+
+<span class="s0">df[</span><span class="s3">&quot;GarageFinish&quot;</span><span class="s0">].value_counts()</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;GarageFinish&quot;</span><span class="s0">]==</span><span class="s3">&quot;Fin&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;GarageFinish&quot;</span><span class="s0">]=</span><span class="s4">2</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;GarageFinish&quot;</span><span class="s0">]==</span><span class="s3">&quot;RFn&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;GarageFinish&quot;</span><span class="s0">]=</span><span class="s4">1</span>
+<span class="s0">df.loc[(df[</span><span class="s3">&quot;GarageFinish&quot;</span><span class="s0">]==</span><span class="s3">&quot;Unf&quot;</span><span class="s0">)</span><span class="s2">,</span><span class="s3">&quot;GarageFinish&quot;</span><span class="s0">]=</span><span class="s4">0</span>
+
+<span class="s0">ext_map = {</span><span class="s3">'Po'</span><span class="s0">: </span><span class="s4">1</span><span class="s2">, </span><span class="s3">'Fa'</span><span class="s0">: </span><span class="s4">2</span><span class="s2">, </span><span class="s3">'TA'</span><span class="s0">: </span><span class="s4">3</span><span class="s2">, </span><span class="s3">'Gd'</span><span class="s0">: </span><span class="s4">4</span><span class="s2">, </span><span class="s3">'Ex'</span><span class="s0">: </span><span class="s4">5</span><span class="s0">}</span>
+<span class="s0">df[</span><span class="s3">'ExterQual'</span><span class="s0">] = df[</span><span class="s3">'ExterQual'</span><span class="s0">].map(ext_map).astype(</span><span class="s3">'int'</span><span class="s0">)</span>
+
+<span class="s0">ext_map = {</span><span class="s3">'Po'</span><span class="s0">: </span><span class="s4">1</span><span class="s2">, </span><span class="s3">'Fa'</span><span class="s0">: </span><span class="s4">2</span><span class="s2">, </span><span class="s3">'TA'</span><span class="s0">: </span><span class="s4">3</span><span class="s2">, </span><span class="s3">'Gd'</span><span class="s0">: </span><span class="s4">4</span><span class="s2">, </span><span class="s3">'Ex'</span><span class="s0">: </span><span class="s4">5</span><span class="s0">}</span>
+<span class="s0">df[</span><span class="s3">'ExterCond'</span><span class="s0">] = df[</span><span class="s3">'ExterCond'</span><span class="s0">].map(ext_map).astype(</span><span class="s3">'int'</span><span class="s0">)</span>
+
+<span class="s1">##############################################</span>
+
+<span class="s1"># new variables</span>
+
+<span class="s0">df[</span><span class="s3">&quot;NEW_EX_QUAL_COND&quot;</span><span class="s0">] = df[</span><span class="s3">'ExterQual'</span><span class="s0">] * df[</span><span class="s3">'ExterCond'</span><span class="s0">]</span>
+<span class="s0">df[</span><span class="s3">&quot;NEW_AREA&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;GrLivArea&quot;</span><span class="s0">] + df[</span><span class="s3">&quot;GarageArea&quot;</span><span class="s0">]</span>
+<span class="s0">df[</span><span class="s3">&quot;NEW_SF&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;1stFlrSF&quot;</span><span class="s0">] + df[</span><span class="s3">&quot;TotalBsmtSF&quot;</span><span class="s0">]</span>
+<span class="s0">df[</span><span class="s3">&quot;NEW_TOTAL_M^2&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;NEW_SF&quot;</span><span class="s0">] + df[</span><span class="s3">&quot;2ndFlrSF&quot;</span><span class="s0">]</span>
+<span class="s0">df[</span><span class="s3">&quot;NEW_ROOM_AREA&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;NEW_TOTAL_M^2&quot;</span><span class="s0">] / df[</span><span class="s3">&quot;TotRmsAbvGrd&quot;</span><span class="s0">]</span>
+<span class="s0">df[</span><span class="s3">'TotalSF'</span><span class="s0">] = (df[</span><span class="s3">'BsmtFinSF1'</span><span class="s0">] + df[</span><span class="s3">'BsmtFinSF2'</span><span class="s0">] + df[</span><span class="s3">'1stFlrSF'</span><span class="s0">] + df[</span><span class="s3">'2ndFlrSF'</span><span class="s0">])</span>
+<span class="s0">df[</span><span class="s3">'TotalPorchSF'</span><span class="s0">] = (df[</span><span class="s3">'OpenPorchSF'</span><span class="s0">] + df[</span><span class="s3">'3SsnPorch'</span><span class="s0">] + df[</span><span class="s3">'EnclosedPorch'</span><span class="s0">] + df[</span><span class="s3">'ScreenPorch'</span><span class="s0">] + df[</span><span class="s3">'WoodDeckSF'</span><span class="s0">])</span>
+
+<span class="s0">df[</span><span class="s3">&quot;YrSold&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;YrSold&quot;</span><span class="s0">].astype(str)</span>
+<span class="s0">df[</span><span class="s3">&quot;MoSold&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;MoSold&quot;</span><span class="s0">].astype(str)</span>
+<span class="s0">df[</span><span class="s3">&quot;YearRemodAdd&quot;</span><span class="s0">]=df[</span><span class="s3">&quot;YearRemodAdd&quot;</span><span class="s0">].astype(str)</span>
+<span class="s0">df[</span><span class="s3">&quot;YearBuilt&quot;</span><span class="s0">]=df[</span><span class="s3">&quot;YearBuilt&quot;</span><span class="s0">].astype(str)</span>
+
+<span class="s0">df[</span><span class="s3">&quot;NEW_BOMBA&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;YearRemodAdd&quot;</span><span class="s0">] + df[</span><span class="s3">&quot;YearBuilt&quot;</span><span class="s0">]</span>
+<span class="s0">df[</span><span class="s3">&quot;NEW_AREA&quot;</span><span class="s0">] = df[</span><span class="s3">&quot;GrLivArea&quot;</span><span class="s0">] + df[</span><span class="s3">&quot;GarageArea&quot;</span><span class="s0">]</span>
+
+
+<span class="s1">##############################################</span>
+<span class="s1"># Rare Encoder</span>
+<span class="s1">##############################################</span>
+
+<span class="s0">rare_analyser(df</span><span class="s2">, </span><span class="s3">&quot;SalePrice&quot;</span><span class="s2">, </span><span class="s4">0.01</span><span class="s0">)</span>
+<span class="s0">df = rare_encoder(df</span><span class="s2">, </span><span class="s4">0.01</span><span class="s0">)</span>
+
+
+<span class="s0">rare_analyser(df</span><span class="s2">, </span><span class="s3">&quot;SalePrice&quot;</span><span class="s2">, </span><span class="s4">0.01</span><span class="s0">)</span>
+
+<span class="s1">####################################################</span>
+<span class="s1"># One-Hot Encoder</span>
+<span class="s1">####################################################</span>
+
+<span class="s0">cat_cols</span><span class="s2">, </span><span class="s0">cat_but_car</span><span class="s2">, </span><span class="s0">num_cols</span><span class="s2">, </span><span class="s0">num_but_cat = grab_col_names(df</span><span class="s2">, </span><span class="s0">car_th=</span><span class="s4">20</span><span class="s0">)</span>
+
+<span class="s0">cat_cols = cat_cols + cat_but_car</span>
+<span class="s0">df = one_hot_encoder(df</span><span class="s2">, </span><span class="s0">cat_cols</span><span class="s2">, </span><span class="s0">drop_first=</span><span class="s2">True</span><span class="s0">)</span>
+
+<span class="s1">#################################################</span>
+<span class="s1"># Modelling( Random Forest)</span>
+<span class="s1">#################################################</span>
+
+<span class="s0">train_df = df[df[</span><span class="s3">'SalePrice'</span><span class="s0">].notnull()]</span>
+<span class="s0">test_df = df[df[</span><span class="s3">'SalePrice'</span><span class="s0">].isnull()].drop(</span><span class="s3">&quot;SalePrice&quot;</span><span class="s2">, </span><span class="s0">axis=</span><span class="s4">1</span><span class="s0">)</span>
+
+<span class="s0">X = train_df.drop([</span><span class="s3">'SalePrice'</span><span class="s2">, </span><span class="s3">&quot;Id&quot;</span><span class="s0">]</span><span class="s2">, </span><span class="s0">axis=</span><span class="s4">1</span><span class="s0">)</span>
+<span class="s0">y = train_df[</span><span class="s3">'SalePrice'</span><span class="s0">]</span>
+
+<span class="s0">X_train</span><span class="s2">, </span><span class="s0">X_test</span><span class="s2">, </span><span class="s0">y_train</span><span class="s2">, </span><span class="s0">y_test = train_test_split(X</span><span class="s2">, </span><span class="s0">y</span><span class="s2">, </span><span class="s0">test_size=</span><span class="s4">0.20</span><span class="s2">, </span><span class="s0">random_state=</span><span class="s4">46</span><span class="s0">)</span>
+
+
+<span class="s0">rf_model = RandomForestRegressor(random_state=</span><span class="s4">42</span><span class="s0">).fit(X_train</span><span class="s2">, </span><span class="s0">y_train)</span>
+<span class="s0">y_pred = rf_model.predict(X_train)</span>
+<span class="s0">np.sqrt(mean_squared_error(y_train</span><span class="s2">, </span><span class="s0">y_pred))   </span><span class="s1">#0.10</span>
+
+<span class="s0">y_pred = rf_model.predict(X_test)</span>
+<span class="s0">np.sqrt(mean_squared_error(y_test</span><span class="s2">, </span><span class="s0">y_pred))    </span><span class="s1">#0.23</span>
+
+<span class="s1">##################################################</span>
+<span class="s1"># RF-TUNED</span>
+
+<span class="s0">rf_params = {</span><span class="s3">&quot;max_depth&quot;</span><span class="s0">: [</span><span class="s4">5</span><span class="s2">, </span><span class="s4">8</span><span class="s2">, None</span><span class="s0">]</span><span class="s2">,</span>
+             <span class="s3">&quot;max_features&quot;</span><span class="s0">: [</span><span class="s4">3</span><span class="s2">, </span><span class="s4">5</span><span class="s2">, </span><span class="s4">15</span><span class="s0">]</span><span class="s2">,</span>
+             <span class="s3">&quot;n_estimators&quot;</span><span class="s0">: [</span><span class="s4">200</span><span class="s2">, </span><span class="s4">500</span><span class="s0">]</span><span class="s2">,</span>
+             <span class="s3">&quot;min_samples_split&quot;</span><span class="s0">: [</span><span class="s4">2</span><span class="s2">, </span><span class="s4">5</span><span class="s2">, </span><span class="s4">8</span><span class="s0">]}</span>
+
+<span class="s0">rf_model = RandomForestRegressor(random_state=</span><span class="s4">42</span><span class="s0">)</span>
+<span class="s0">rf_cv_model = GridSearchCV(rf_model</span><span class="s2">, </span><span class="s0">rf_params</span><span class="s2">, </span><span class="s0">cv=</span><span class="s4">10</span><span class="s2">, </span><span class="s0">n_jobs=-</span><span class="s4">1</span><span class="s2">, </span><span class="s0">verbose=</span><span class="s4">1</span><span class="s0">).fit(X_train</span><span class="s2">, </span><span class="s0">y_train)</span>
+<span class="s0">rf_cv_model.best_params_</span>
+
+
+<span class="s0">rf_tuned = RandomForestRegressor(**rf_cv_model.best_params_).fit(X_train</span><span class="s2">, </span><span class="s0">y_train)</span>
+
+<span class="s0">y_pred = rf_tuned.predict(X_train)</span>
+<span class="s0">np.sqrt(mean_squared_error(y_train</span><span class="s2">, </span><span class="s0">y_pred))   </span><span class="s1"># 0.12</span>
+
+<span class="s0">y_pred = rf_tuned.predict(X_test)</span>
+<span class="s0">np.sqrt(mean_squared_error(y_test</span><span class="s2">, </span><span class="s0">y_pred))    </span><span class="s1"># 0.27</span>
+
+
+<span class="s1">##########################################</span>
+<span class="s1"># Modellling( LightGBM)</span>
+<span class="s1">##########################################</span>
+<span class="s2">from </span><span class="s0">lightgbm </span><span class="s2">import </span><span class="s0">LGBMRegressor</span>
+
+
+<span class="s0">lgbm_model = LGBMRegressor(random_state=</span><span class="s4">42</span><span class="s0">).fit(X_train</span><span class="s2">, </span><span class="s0">y_train)</span>
+<span class="s0">y_pred = lgbm_model.predict(X_train)</span>
+<span class="s0">np.sqrt(mean_squared_error(y_train</span><span class="s2">, </span><span class="s0">y_pred))   </span><span class="s1">#0.10</span>
+
+<span class="s0">y.mean()</span>
+
+<span class="s0">y_pred = lgbm_model.predict(X_test)</span>
+<span class="s0">np.sqrt(mean_squared_error(y_test</span><span class="s2">, </span><span class="s0">y_pred))    </span><span class="s1">#0.23</span>
+
+<span class="s1">##########################################</span>
+<span class="s1"># LightGBM-TUNED</span>
+<span class="s1">##########################################</span>
+
+<span class="s0">lgbm_param = {</span><span class="s3">&quot;learning_rate&quot;</span><span class="s0">: [</span><span class="s4">0.01</span><span class="s2">, </span><span class="s4">0.1</span><span class="s0">]</span><span class="s2">,</span>
+               <span class="s3">&quot;n_estimators&quot;</span><span class="s0">: [</span><span class="s4">100</span><span class="s2">,</span><span class="s4">500</span><span class="s2">, </span><span class="s4">1000</span><span class="s0">]</span><span class="s2">,</span>
+               <span class="s3">&quot;max_depth&quot;</span><span class="s0">: [-</span><span class="s4">1</span><span class="s2">,</span><span class="s4">3</span><span class="s2">, </span><span class="s4">5</span><span class="s2">, </span><span class="s4">8</span><span class="s0">]</span><span class="s2">,</span>
+               <span class="s3">&quot;colsample_bytree&quot;</span><span class="s0">: [</span><span class="s4">1</span><span class="s2">, </span><span class="s4">0.8</span><span class="s2">, </span><span class="s4">0.5</span><span class="s0">]}</span>
+
+<span class="s0">lgbm_cv_model = GridSearchCV(lgbm_model</span><span class="s2">,</span>
+                             <span class="s0">lgbm_param</span><span class="s2">,</span>
+                             <span class="s0">cv=</span><span class="s4">10</span><span class="s2">,</span>
+                             <span class="s0">n_jobs=-</span><span class="s4">1</span><span class="s2">,</span>
+                             <span class="s0">verbose=</span><span class="s4">2</span><span class="s0">).fit(X_train</span><span class="s2">, </span><span class="s0">y_train)</span>
+
+<span class="s0">lgbm_cv_model.best_params_</span>
+
+
+<span class="s0">lgbm_tuned = LGBMRegressor(**lgbm_cv_model.best_params_).fit(X_train</span><span class="s2">, </span><span class="s0">y_train)</span>
+<span class="s0">y_pred = lgbm_tuned.predict(X_test)</span>
+<span class="s0">np.sqrt(mean_squared_error(y_test</span><span class="s2">, </span><span class="s0">y_pred))  </span><span class="s1">#0.25</span>
+
+
+
+<span class="s1">##########################################</span>
+
+<span class="s2">def </span><span class="s0">plot_importance(model</span><span class="s2">, </span><span class="s0">features</span><span class="s2">, </span><span class="s0">num=len(X)</span><span class="s2">, </span><span class="s0">save=</span><span class="s2">False</span><span class="s0">):</span>
+    <span class="s0">feature_imp = pd.DataFrame({</span><span class="s3">'Value'</span><span class="s0">: model.feature_importances_</span><span class="s2">, </span><span class="s3">'Feature'</span><span class="s0">: features.columns})</span>
+    <span class="s0">plt.figure(figsize=(</span><span class="s4">10</span><span class="s2">, </span><span class="s4">10</span><span class="s0">))</span>
+    <span class="s0">sns.set(font_scale=</span><span class="s4">1</span><span class="s0">)</span>
+    <span class="s0">sns.barplot(x=</span><span class="s3">&quot;Value&quot;</span><span class="s2">, </span><span class="s0">y=</span><span class="s3">&quot;Feature&quot;</span><span class="s2">, </span><span class="s0">data=feature_imp.sort_values(by=</span><span class="s3">&quot;Value&quot;</span><span class="s2">,</span>
+                                                                     <span class="s0">ascending=</span><span class="s2">False</span><span class="s0">)[</span><span class="s4">0</span><span class="s0">:num])</span>
+    <span class="s0">plt.title(</span><span class="s3">'Features'</span><span class="s0">)</span>
+    <span class="s0">plt.tight_layout()</span>
+    <span class="s0">plt.show()</span>
+    <span class="s2">if </span><span class="s0">save:</span>
+        <span class="s0">plt.savefig(</span><span class="s3">'importances.png'</span><span class="s0">)</span>
+
+
+<span class="s0">plot_importance(lgbm_model</span><span class="s2">, </span><span class="s0">X_train</span><span class="s2">, </span><span class="s4">20</span><span class="s0">)</span>
+
+
+<span class="s1">##########################################</span>
+
+
+<span class="s0">kaggle_test_df = test_df.drop([</span><span class="s3">&quot;Id&quot;</span><span class="s0">]</span><span class="s2">, </span><span class="s0">axis=</span><span class="s4">1</span><span class="s0">)</span>
+<span class="s0">kaggle = lgbm_model.predict(kaggle_test_df)</span>
+
+<span class="s0">kaggle_submission = pd.DataFrame()</span>
+<span class="s0">kaggle_submission[</span><span class="s3">&quot;Id&quot;</span><span class="s0">] = test_df[</span><span class="s3">&quot;Id&quot;</span><span class="s0">]</span>
+<span class="s0">kaggle_submission[</span><span class="s3">&quot;SalePrice&quot;</span><span class="s0">] = kaggle</span>
+
+<span class="s0">kaggle_submission.head()</span>
+
+<span class="s0">kaggle_submission.to_csv(</span><span class="s3">&quot;kaggle_submis.csv&quot;</span><span class="s2">, </span><span class="s0">index=</span><span class="s2">False</span><span class="s0">)</span>
+
+
+<span class="s1"># Kaggle score :0.14</span></pre>
+</body>
+</html>
